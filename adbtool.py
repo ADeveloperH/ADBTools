@@ -284,7 +284,45 @@ def action_uninstall(project: Project, device: str) -> None:
 
 
 def action_device_info(device: str) -> None:
-    run_adb(["shell", "getprop", "ro.product.model"], device)
+    props_result = run_adb(["shell", "getprop"], device, capture=True)
+    size_result = run_adb(["shell", "wm", "size"], device, capture=True)
+    density_result = run_adb(["shell", "wm", "density"], device, capture=True)
+    battery_result = run_adb(["shell", "dumpsys", "battery"], device, capture=True)
+    storage_result = run_adb(["shell", "df", "-h", "/data"], device, capture=True)
+
+    props = {}
+    if props_result.returncode == 0:
+        for line in props_result.stdout.splitlines():
+            if line.startswith("[") and "]: [" in line:
+                key, value = line[1:].split("]: [", 1)
+                props[key] = value.rstrip("]")
+
+    def first_line(result: subprocess.CompletedProcess) -> str:
+        return next((line.strip() for line in result.stdout.splitlines() if line.strip()), "未知")
+
+    battery = {}
+    if battery_result.returncode == 0:
+        for line in battery_result.stdout.splitlines():
+            if ":" in line:
+                key, value = line.split(":", 1)
+                battery[key.strip().lower()] = value.strip()
+
+    storage = "未知"
+    if storage_result.returncode == 0:
+        rows = [line.split() for line in storage_result.stdout.splitlines() if line.strip()]
+        if len(rows) >= 2 and len(rows[-1]) >= 4:
+            storage = f"总计 {rows[-1][1]}，已用 {rows[-1][2]}，可用 {rows[-1][3]}"
+
+    print("\n设备信息")
+    print(f"  设备序列号: {device}")
+    print(f"  制造商/品牌: {props.get('ro.product.manufacturer', '未知')} / {props.get('ro.product.brand', '未知')}")
+    print(f"  型号: {props.get('ro.product.model', '未知')}")
+    print(f"  Android: {props.get('ro.build.version.release', '未知')} (SDK {props.get('ro.build.version.sdk', '未知')})")
+    print(f"  ABI: {props.get('ro.product.cpu.abi', '未知')}")
+    print(f"  分辨率: {first_line(size_result)}")
+    print(f"  屏幕密度: {first_line(density_result)}")
+    print(f"  电量: {battery.get('level', '未知')}% ({battery.get('status', '未知')})")
+    print(f"  数据分区: {storage}")
 
 
 def action_activity(device: str) -> None:

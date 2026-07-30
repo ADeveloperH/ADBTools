@@ -66,7 +66,7 @@ artifacts/
 2. 查看当前 Activity / Task
 3. 截图
 4. 录屏
-5. 设备信息
+5. 设备信息（型号、Android、分辨率、密度、电量、存储）
 
 项目操作默认包括：
 
@@ -91,6 +91,7 @@ artifacts/
 - 保存当前应用日志：不重启应用，直接保存当前运行实例的日志。
 - 打开应用后门：使用当前项目包名和固定的 `com.foundation.unity.productdebugger.ProductSettingsActivity` 启动调试设置页面。
 - 查看应用 Alarm：查询设备上的 `dumpsys alarm`，只显示当前项目包名相关内容。
+- 设备信息：显示序列号、制造商/品牌、型号、Android/SDK、CPU ABI、屏幕分辨率、屏幕密度、电量和 `/data` 分区存储。
 - 截图/录屏：属于通用设备操作，默认按时间保存到 `artifacts/screenshots/` 和 `artifacts/recordings/`，也可临时修改保存路径。
 - 清除数据/卸载：执行前要求确认。
 
