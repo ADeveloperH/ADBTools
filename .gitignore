@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+.pytest_cache/
+
+# Local OS/editor files
+.DS_Store
+.idea/
+.vscode/
+
+# Generated ADB output
+artifacts/*
+!artifacts/.gitkeep
+
+# Local machine-specific configuration
+config/local*.json

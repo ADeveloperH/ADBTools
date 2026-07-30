@@ -1,0 +1,90 @@
+{
+  "global": [
+    {
+      "id": "install_apk",
+      "label": "安装 APK",
+      "order": 10,
+      "enabled": true
+    },
+    {
+      "id": "show_activity",
+      "label": "查看当前 Activity / Task",
+      "order": 20,
+      "enabled": true
+    },
+    {
+      "id": "screenshot",
+      "label": "截图",
+      "order": 30,
+      "enabled": true
+    },
+    {
+      "id": "record",
+      "label": "录屏",
+      "order": 40,
+      "enabled": true
+    },
+    {
+      "id": "device_info",
+      "label": "设备信息",
+      "order": 50,
+      "enabled": true
+    }
+  ],
+  "project": [
+    {
+      "id": "restart_log",
+      "label": "重启应用并保存日志",
+      "order": 10,
+      "enabled": true
+    },
+    {
+      "id": "save_log",
+      "label": "保存当前应用日志",
+      "order": 20,
+      "enabled": true
+    },
+    {
+      "id": "product_settings",
+      "label": "打开应用后门",
+      "order": 30,
+      "enabled": true
+    },
+    {
+      "id": "alarm",
+      "label": "查看应用 Alarm",
+      "order": 40,
+      "enabled": true
+    },
+    {
+      "id": "launch",
+      "label": "启动应用",
+      "order": 50,
+      "enabled": true
+    },
+    {
+      "id": "restart",
+      "label": "重启应用",
+      "order": 60,
+      "enabled": true
+    },
+    {
+      "id": "clear",
+      "label": "清除应用数据",
+      "order": 70,
+      "enabled": true
+    },
+    {
+      "id": "uninstall",
+      "label": "卸载应用",
+      "order": 80,
+      "enabled": true
+    },
+    {
+      "id": "app_info",
+      "label": "应用信息",
+      "order": 90,
+      "enabled": true
+    }
+  ]
+}

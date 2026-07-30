@@ -1,0 +1,10 @@
+{
+  "projects": [
+    {
+      "id": "com_lucky_mahjong_casual",
+      "project_name": "Lucky Mahjong Match",
+      "app_name": "Lucky Mahjong Match",
+      "package": "com.lucky.mahjong.casual"
+    }
+  ]
+}
