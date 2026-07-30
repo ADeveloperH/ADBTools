@@ -76,6 +76,8 @@ class Project:
     project_name: str
     app_name: str
     package: str
+    store_name: str = ""
+    company_name: str = ""
 
 
 def load_projects() -> list[Project]:

@@ -25,13 +25,17 @@
   "projects": [
     {
       "id": "com_company_game",
-      "project_name": "游戏 A",
-      "app_name": "游戏 A",
-      "package": "com.company.game"
+      "project_name": "商店显示名称",
+      "app_name": "应用名称",
+      "package": "com.company.game",
+      "store_name": "Google Play 商店名称",
+      "company_name": "公司名称"
     }
   ]
 }
 ```
+
+其中 `project_name` 用于项目选择菜单，通常优先使用商店名称；`app_name` 和 `package` 分别保存应用名称和包名。`store_name`、`company_name` 用于保留项目资料，缺省时可以留空。
 
 菜单配置保存在 `config/menu.json`。每个菜单项使用固定的 `id` 关联内部命令，你可以直接编辑 `label` 改名称、修改 `order` 调整顺序、设置 `enabled` 为 `false` 隐藏命令。例如：
 
