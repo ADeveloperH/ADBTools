@@ -1,0 +1,4 @@
+interface:
+  display_name: "ADB Project Import"
+  short_description: "从压缩包导入项目配置"
+  default_prompt: "使用 $adb-project-import 导入当前目录下压缩包里的 ADB 项目配置。"

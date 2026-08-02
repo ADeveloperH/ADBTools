@@ -29,14 +29,15 @@ DEFAULT_MENU = {
     ],
     "project": [
         {"id": "restart_log", "label": "重启应用并保存日志", "order": 10, "enabled": True},
-        {"id": "save_log", "label": "保存当前应用日志", "order": 20, "enabled": True},
-        {"id": "product_settings", "label": "打开 Product Settings", "order": 30, "enabled": True},
-        {"id": "alarm", "label": "查看应用 Alarm", "order": 40, "enabled": True},
-        {"id": "launch", "label": "启动应用", "order": 50, "enabled": True},
-        {"id": "restart", "label": "重启应用", "order": 60, "enabled": True},
-        {"id": "clear", "label": "清除应用数据", "order": 70, "enabled": True},
-        {"id": "uninstall", "label": "卸载应用", "order": 80, "enabled": True},
-        {"id": "app_info", "label": "应用信息", "order": 90, "enabled": True},
+        {"id": "filter_log", "label": "按关键字过滤查看日志", "order": 20, "enabled": True},
+        {"id": "save_log", "label": "保存当前应用日志", "order": 30, "enabled": True},
+        {"id": "product_settings", "label": "打开 Product Settings", "order": 40, "enabled": True},
+        {"id": "alarm", "label": "查看应用 Alarm", "order": 50, "enabled": True},
+        {"id": "launch", "label": "启动应用", "order": 60, "enabled": True},
+        {"id": "restart", "label": "重启应用", "order": 70, "enabled": True},
+        {"id": "clear", "label": "清除应用数据", "order": 80, "enabled": True},
+        {"id": "uninstall", "label": "卸载应用", "order": 90, "enabled": True},
+        {"id": "app_info", "label": "应用信息", "order": 100, "enabled": True},
     ],
 }
 
@@ -101,6 +102,11 @@ def ask(prompt: str, default: Optional[str] = None) -> str:
     suffix = f" [{default}]" if default else ""
     value = input(f"{prompt}{suffix}: ").strip()
     return value or (default or "")
+
+
+def normalize_path(value: str) -> Path:
+    text = value.strip().strip("'\"")
+    return Path(text).expanduser()
 
 
 def choose(title: str, options: list[str], allow_back: bool = True) -> Optional[int]:
@@ -205,7 +211,7 @@ def confirm(message: str) -> bool:
 
 
 def action_install(device: str) -> None:
-    apk = Path(ask("APK 文件路径")).expanduser()
+    apk = normalize_path(ask("APK 文件路径"))
     if not apk.is_file():
         print(f"文件不存在：{apk}")
         return
@@ -220,6 +226,12 @@ def action_launch(project: Project, device: str, restart: bool = False) -> None:
 
 def log_path(project: Project) -> Path:
     path = ARTIFACTS_PATH / project.id / "logs" / f"{datetime.now():%Y%m%d_%H%M%S}.log"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def filtered_log_path(project: Project) -> Path:
+    path = ARTIFACTS_PATH / project.id / "logs" / f"{datetime.now():%Y%m%d_%H%M%S}_filtered.log"
     path.parent.mkdir(parents=True, exist_ok=True)
     return path
 
@@ -247,6 +259,68 @@ def action_log(project: Project, device: str, restart: bool = False) -> None:
             print("\n日志已停止并保存。")
 
 
+def parse_keywords(value: str) -> list[str]:
+    for separator in [",", ";", "，", "；"]:
+        value = value.replace(separator, " ")
+    keywords = []
+    seen = set()
+    for item in value.split():
+        keyword = item.strip()
+        lowered = keyword.lower()
+        if keyword and lowered not in seen:
+            keywords.append(keyword)
+            seen.add(lowered)
+    return keywords
+
+
+def action_filter_log(project: Project, device: str) -> None:
+    keywords = parse_keywords(ask("输入要过滤的 tag/关键字（多个用逗号或空格分隔）"))
+    if not keywords:
+        print("至少需要输入一个 tag 或关键字。")
+        return
+    pid = _pid(project.package, device)
+    if pid == "0":
+        print(f"未找到运行中的应用：{project.package}")
+        return
+
+    output = filtered_log_path(project)
+    lowered_keywords = [keyword.lower() for keyword in keywords]
+    print(f"过滤条件：{' OR '.join(keywords)}")
+    print(f"过滤日志保存到：{output}")
+    print("按 Ctrl-C 停止日志。匹配到的日志会实时显示并写入文件。")
+
+    command = ["logcat", "--pid", pid, "-v", "threadtime"]
+    adb = adb_path()
+    full_command = [adb, "-s", device, *command]
+    print(f"\n$ {shlex.join(full_command)} | filter {' '.join(shlex.quote(k) for k in keywords)}")
+
+    process = subprocess.Popen(
+        full_command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+    )
+    try:
+        with output.open("w", encoding="utf-8") as stream:
+            if process.stdout is None:
+                return
+            for line in process.stdout:
+                if any(keyword in line.lower() for keyword in lowered_keywords):
+                    print(line, end="")
+                    stream.write(line)
+                    stream.flush()
+    except KeyboardInterrupt:
+        print("\n日志已停止并保存。")
+    finally:
+        process.terminate()
+        try:
+            process.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait()
+
+
 def _pid(package: str, device: str) -> str:
     result = run_adb(["shell", "pidof", package], device, capture=True)
     pid = result.stdout.strip().split()[0] if result.stdout.strip() else "0"
@@ -255,7 +329,7 @@ def _pid(package: str, device: str) -> str:
 
 def action_screenshot(device: str) -> None:
     default = ARTIFACTS_PATH / "screenshots" / f"{datetime.now():%Y%m%d_%H%M%S}.png"
-    output = Path(ask("截图保存路径", str(default))).expanduser()
+    output = normalize_path(ask("截图保存路径", str(default)))
     output.parent.mkdir(parents=True, exist_ok=True)
     result = run_adb(["exec-out", "screencap", "-p"], device, capture=True, text=False)
     if result.returncode == 0:
@@ -267,7 +341,7 @@ def action_screenshot(device: str) -> None:
 
 def action_record(device: str) -> None:
     default = ARTIFACTS_PATH / "recordings" / f"{datetime.now():%Y%m%d_%H%M%S}.mp4"
-    output = Path(ask("录屏保存路径", str(default))).expanduser()
+    output = normalize_path(ask("录屏保存路径", str(default)))
     seconds = ask("录屏时长（秒）", "30")
     remote = "/sdcard/adbtool-record.mp4"
     run_adb(["shell", "screenrecord", "--time-limit", seconds, remote], device)
@@ -378,6 +452,7 @@ def global_menu(device: str) -> None:
 def project_menu(project: Project, device: str) -> None:
     handlers = {
         "restart_log": lambda p, d: action_log(p, d, restart=True),
+        "filter_log": action_filter_log,
         "save_log": action_log,
         "product_settings": action_product_settings,
         "alarm": action_alarm,
