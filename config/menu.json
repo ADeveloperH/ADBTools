@@ -57,39 +57,45 @@
       "enabled": true
     },
     {
+      "id": "product_settings_log",
+      "label": "打开应用后门并保存日志",
+      "order": 50,
+      "enabled": true
+    },
+    {
       "id": "alarm",
       "label": "查看应用 Alarm",
-      "order": 50,
+      "order": 60,
       "enabled": true
     },
     {
       "id": "launch",
       "label": "启动应用",
-      "order": 60,
+      "order": 70,
       "enabled": true
     },
     {
       "id": "restart",
       "label": "重启应用",
-      "order": 70,
+      "order": 80,
       "enabled": true
     },
     {
       "id": "clear",
       "label": "清除应用数据",
-      "order": 80,
+      "order": 90,
       "enabled": true
     },
     {
       "id": "uninstall",
       "label": "卸载应用",
-      "order": 90,
+      "order": 100,
       "enabled": true
     },
     {
       "id": "app_info",
       "label": "应用信息",
-      "order": 100,
+      "order": 110,
       "enabled": true
     }
   ]

@@ -32,12 +32,13 @@ DEFAULT_MENU = {
         {"id": "filter_log", "label": "按关键字过滤查看日志", "order": 20, "enabled": True},
         {"id": "save_log", "label": "保存当前应用日志", "order": 30, "enabled": True},
         {"id": "product_settings", "label": "打开 Product Settings", "order": 40, "enabled": True},
-        {"id": "alarm", "label": "查看应用 Alarm", "order": 50, "enabled": True},
-        {"id": "launch", "label": "启动应用", "order": 60, "enabled": True},
-        {"id": "restart", "label": "重启应用", "order": 70, "enabled": True},
-        {"id": "clear", "label": "清除应用数据", "order": 80, "enabled": True},
-        {"id": "uninstall", "label": "卸载应用", "order": 90, "enabled": True},
-        {"id": "app_info", "label": "应用信息", "order": 100, "enabled": True},
+        {"id": "product_settings_log", "label": "打开应用后门并保存日志", "order": 50, "enabled": True},
+        {"id": "alarm", "label": "查看应用 Alarm", "order": 60, "enabled": True},
+        {"id": "launch", "label": "启动应用", "order": 70, "enabled": True},
+        {"id": "restart", "label": "重启应用", "order": 80, "enabled": True},
+        {"id": "clear", "label": "清除应用数据", "order": 90, "enabled": True},
+        {"id": "uninstall", "label": "卸载应用", "order": 100, "enabled": True},
+        {"id": "app_info", "label": "应用信息", "order": 110, "enabled": True},
     ],
 }
 
@@ -411,9 +412,18 @@ def action_activity(device: str) -> None:
         print(result.stderr.strip())
 
 
-def action_product_settings(project: Project, device: str) -> None:
+def action_product_settings(project: Project, device: str) -> bool:
     component = f"{project.package}/{PRODUCT_SETTINGS_ACTIVITY}"
-    run_adb(["shell", "am", "start", "-n", component], device)
+    result = run_adb(["shell", "am", "start", "-n", component], device)
+    if result.returncode != 0:
+        print("应用后门未能打开，不开始保存日志。")
+        return False
+    return True
+
+
+def action_product_settings_log(project: Project, device: str) -> None:
+    if action_product_settings(project, device):
+        action_log(project, device)
 
 
 def action_alarm(project: Project, device: str) -> None:
@@ -455,6 +465,7 @@ def project_menu(project: Project, device: str) -> None:
         "filter_log": action_filter_log,
         "save_log": action_log,
         "product_settings": action_product_settings,
+        "product_settings_log": action_product_settings_log,
         "alarm": action_alarm,
         "launch": lambda p, d: action_launch(p, d),
         "restart": lambda p, d: action_launch(p, d, restart=True),
