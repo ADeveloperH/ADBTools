@@ -19,9 +19,10 @@ interface Props {
   entries: LogEntry[];
   selectedId: number | null;
   onSelect: (id: number) => void;
+  scrollRequest: { id: number; seq: number } | null;
 }
 
-export function LogList({ entries, selectedId, onSelect }: Props) {
+export function LogList({ entries, selectedId, onSelect, scrollRequest }: Props) {
   const parentRef = useRef<HTMLDivElement>(null);
   const autoScrollRef = useRef(true);
   const [expandedId, setExpandedId] = useState<number | null>(null);
@@ -47,6 +48,16 @@ export function LogList({ entries, selectedId, onSelect }: Props) {
       el.scrollTop = el.scrollHeight;
     }
   }, [entries]);
+
+  // 收到定位请求时，滚动到选中的日志（居中，方便看上下文）。
+  useEffect(() => {
+    if (!scrollRequest) return;
+    const idx = entries.findIndex((e) => e.id === scrollRequest.id);
+    if (idx >= 0) {
+      virtualizer.scrollToIndex(idx, { align: "center" });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scrollRequest]);
 
   const toggleExpand = (id: number) => {
     setExpandedId((prev) => (prev === id ? null : id));

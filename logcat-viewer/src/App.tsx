@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { useLogcat } from "./hooks/useLogcat";
@@ -56,6 +56,26 @@ export default function App() {
   const [copied, setCopied] = useState(false);
 
   const selectedEntry = entries.find((e) => e.id === selectedId) ?? null;
+  const [scrollRequest, setScrollRequest] = useState<{
+    id: number;
+    seq: number;
+  } | null>(null);
+  const prevFiltersRef = useRef(filters);
+
+  // 过滤条件变化时，定位到选中的日志，方便查看上下文。
+  useEffect(() => {
+    const prev = prevFiltersRef.current;
+    const changed =
+      prev.tags !== filters.tags ||
+      prev.search !== filters.search ||
+      prev.pid !== filters.pid ||
+      prev.minLevel !== filters.minLevel;
+    prevFiltersRef.current = filters;
+    if (changed && selectedId != null && entries.some((e) => e.id === selectedId)) {
+      setScrollRequest({ id: selectedId, seq: Date.now() });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters]);
 
   // 生效应用 = 手动添加（优先）∪ 内置/远程（排除已删除的），按名称排序。
   const effectiveApps = useMemo(() => {
@@ -439,6 +459,7 @@ export default function App() {
         entries={entries}
         selectedId={selectedId}
         onSelect={handleSelect}
+        scrollRequest={scrollRequest}
       />
 
       {error && <div className="error">{error}</div>}
