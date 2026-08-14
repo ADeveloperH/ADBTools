@@ -1,0 +1,2 @@
+# 项目导入脚本（.codex/skills/adb-project-import/scripts/import_projects.py）依赖
+openpyxl>=3.1

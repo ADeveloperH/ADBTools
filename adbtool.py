@@ -31,7 +31,7 @@ DEFAULT_MENU = {
         {"id": "restart_log", "label": "重启应用并保存日志", "order": 10, "enabled": True},
         {"id": "filter_log", "label": "按关键字过滤查看日志", "order": 20, "enabled": True},
         {"id": "save_log", "label": "保存当前应用日志", "order": 30, "enabled": True},
-        {"id": "product_settings", "label": "打开 Product Settings", "order": 40, "enabled": True},
+        {"id": "product_settings", "label": "打开应用后门", "order": 40, "enabled": True},
         {"id": "product_settings_log", "label": "打开应用后门并保存日志", "order": 50, "enabled": True},
         {"id": "alarm", "label": "查看应用 Alarm", "order": 60, "enabled": True},
         {"id": "launch", "label": "启动应用", "order": 70, "enabled": True},
@@ -90,7 +90,13 @@ def load_projects() -> list[Project]:
     except (OSError, json.JSONDecodeError) as exc:
         print(f"无法读取配置 {CONFIG_PATH}: {exc}")
         return []
-    return [Project(**item) for item in data.get("projects", [])]
+    projects: list[Project] = []
+    for item in data.get("projects", []):
+        try:
+            projects.append(Project(**item))
+        except (TypeError, ValueError) as exc:
+            print(f"跳过无效项目配置：{item}（{exc}）")
+    return projects
 
 
 def save_projects(projects: list[Project]) -> None:
@@ -343,6 +349,7 @@ def action_screenshot(device: str) -> None:
 def action_record(device: str) -> None:
     default = ARTIFACTS_PATH / "recordings" / f"{datetime.now():%Y%m%d_%H%M%S}.mp4"
     output = normalize_path(ask("录屏保存路径", str(default)))
+    output.parent.mkdir(parents=True, exist_ok=True)
     seconds = ask("录屏时长（秒）", "30")
     remote = "/sdcard/adbtool-record.mp4"
     run_adb(["shell", "screenrecord", "--time-limit", seconds, remote], device)
@@ -435,6 +442,35 @@ def action_alarm(project: Project, device: str) -> None:
         print(result.stderr.strip())
 
 
+def action_app_info(project: Project, device: str) -> None:
+    path_result = run_adb(["shell", "pm", "path", project.package], device, capture=True)
+    dumpsys_result = run_adb(["shell", "dumpsys", "package", project.package], device, capture=True)
+    meminfo_result = run_adb(["shell", "dumpsys", "meminfo", project.package], device, capture=True)
+
+    dumpsys_text = dumpsys_result.stdout if dumpsys_result.returncode == 0 else ""
+    meminfo_text = meminfo_result.stdout if meminfo_result.returncode == 0 else ""
+
+    def find_prop(text: str, key: str) -> str:
+        for line in text.splitlines():
+            line = line.strip()
+            if line.startswith(key + "="):
+                return line.split("=", 1)[1].split()[0]
+        return "未知"
+
+    apk_path = "未知"
+    if path_result.returncode == 0 and path_result.stdout.strip():
+        apk_path = path_result.stdout.strip()
+    total_line = next(
+        (line.strip() for line in meminfo_text.splitlines() if line.strip().startswith("TOTAL")),
+        "",
+    )
+
+    print(f"\n应用信息：{project.app_name} ({project.package})")
+    print(f"  版本: {find_prop(dumpsys_text, 'versionName')} (versionCode {find_prop(dumpsys_text, 'versionCode')})")
+    print(f"  APK 路径: {apk_path}")
+    print(f"  内存(TOTAL PSS): {total_line or '未知'}")
+
+
 def global_menu(device: str) -> None:
     handlers = {
         "install_apk": action_install,
@@ -471,7 +507,7 @@ def project_menu(project: Project, device: str) -> None:
         "restart": lambda p, d: action_launch(p, d, restart=True),
         "clear": action_clear,
         "uninstall": action_uninstall,
-        "app_info": lambda p, d: run_adb(["shell", "dumpsys", "meminfo", p.package], d),
+        "app_info": action_app_info,
     }
     while True:
         commands = load_menu("project")

@@ -46,7 +46,7 @@ def normalize(value) -> str:
     return "" if value is None else str(value).strip()
 
 
-def read_projects_from_workbook(workbook: Path) -> list[Project]:
+def read_projects_from_workbook(workbook: Path) -> tuple[list[Project], int]:
     wb = load_workbook(workbook, read_only=True, data_only=True)
     if "APP 信息总表" not in wb.sheetnames:
         raise ValueError("Workbook missing 'APP 信息总表' sheet.")
@@ -57,15 +57,18 @@ def read_projects_from_workbook(workbook: Path) -> list[Project]:
         raise ValueError("Unexpected summary sheet layout.")
 
     result: list[Project] = []
+    skipped = 0
     for row in rows:
         values = [normalize(v) for v in row]
         if not any(values):
+            skipped += 1
             continue
         app_name = values[0] if len(values) > 0 else ""
         store_name = values[1] if len(values) > 1 else ""
         company_name = values[2] if len(values) > 2 else ""
         package = values[3] if len(values) > 3 else ""
         if not package:
+            skipped += 1
             continue
         project_name = store_name or app_name
         project_id = package.replace(".", "_")
@@ -79,7 +82,7 @@ def read_projects_from_workbook(workbook: Path) -> list[Project]:
                 company_name=company_name,
             )
         )
-    return result
+    return result, skipped
 
 
 def load_existing(projects_json: Path) -> list[Project]:
@@ -93,13 +96,21 @@ def merge(existing: list[Project], incoming: list[Project]) -> tuple[list[Projec
     by_package = {item.package: item for item in existing}
     updated = 0
     added = 0
+    new_projects: list[Project] = []
+    seen_incoming: set[str] = set()
     for project in incoming:
+        if project.package in seen_incoming:
+            continue
+        seen_incoming.add(project.package)
         if project.package in by_package:
             updated += 1
         else:
             added += 1
+            new_projects.append(project)
         by_package[project.package] = project
-    merged = sorted(by_package.values(), key=lambda p: (p.project_name.lower(), p.package))
+    # 保持已有项目的原顺序（仅更新字段），新增项目按导入顺序追加到末尾。
+    merged = [by_package[item.package] for item in existing if item.package in by_package]
+    merged += new_projects
     return merged, added, updated
 
 
@@ -117,13 +128,12 @@ def main() -> int:
     archive = find_archive(cwd)
     tmpdir, workbook = extract_xlsx(archive)
     try:
-        incoming = read_projects_from_workbook(workbook)
+        incoming, skipped = read_projects_from_workbook(workbook)
         projects_json = cwd / "config" / "projects.json"
         existing = load_existing(projects_json)
         existing_by_package = index_by_package(existing)
         merged, added, updated = merge(existing, incoming)
         write_projects(projects_json, merged)
-        skipped = max(0, len(incoming) - added - updated)
         added_items = [project for project in incoming if project.package not in existing_by_package]
         updated_items = [project for project in incoming if project.package in existing_by_package]
         changed_items = [
