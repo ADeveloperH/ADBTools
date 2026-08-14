@@ -7,20 +7,32 @@ use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter, State};
 
 use adb::{
-    clear_app_data as adb_clear_app_data, clear_log as adb_clear_log, connect as adb_connect,
+    app_alarm as adb_app_alarm, clear_app_data as adb_clear_app_data, clear_log as adb_clear_log,
+    connect as adb_connect, current_activity as adb_current_activity,
     device_info as adb_device_info, disconnect as adb_disconnect,
     fetch_remote_apps as adb_fetch_remote_apps, generate_pairing as adb_generate_pairing,
     install_apk as adb_install_apk, list_devices as adb_list_devices,
-    mdns_pairing_address as adb_mdns_pairing_address, open_backdoor as adb_open_backdoor,
-    pair as adb_pair, resolve_pids as adb_resolve_pids, restart_app as adb_restart_app,
-    screencap_png as adb_screencap_png, uninstall_app as adb_uninstall_app, App, Device,
-    DeviceInfo, LogcatProcess, PairingInfo,
+    mdns_pairing_address as adb_mdns_pairing_address, mirror as adb_mirror,
+    open_backdoor as adb_open_backdoor, pair as adb_pair, resolve_pids as adb_resolve_pids,
+    restart_app as adb_restart_app, screencap_png as adb_screencap_png,
+    uninstall_app as adb_uninstall_app, App, Device, DeviceInfo, LogcatProcess, PairingInfo,
+    ScrcpyRecord,
 };
 
 /// 全局运行状态：当前 logcat 进程 + 代号（用于识别过期读取线程）。
 struct RunningLogcat {
     child: Mutex<Option<LogcatProcess>>,
     generation: Arc<AtomicU64>,
+}
+
+/// 当前录屏会话（scrcpy 子进程 + 输出路径）。
+struct RecordingSession {
+    child: ScrcpyRecord,
+    path: String,
+}
+
+struct RecordingState {
+    session: Mutex<Option<RecordingSession>>,
 }
 
 #[tauri::command]
@@ -244,6 +256,65 @@ async fn device_info(device: Option<String>) -> Result<DeviceInfo, String> {
 }
 
 #[tauri::command]
+async fn current_activity(device: Option<String>) -> Result<String, String> {
+    log::info!("收到前端命令 current_activity：device={:?}", device);
+    adb_current_activity(device.as_deref())
+}
+
+#[tauri::command]
+async fn start_recording(
+    app: AppHandle,
+    state: State<'_, RecordingState>,
+    device: Option<String>,
+    mbps: u32,
+) -> Result<Option<String>, String> {
+    use tauri_plugin_dialog::DialogExt;
+    log::info!("收到前端命令 start_recording：device={:?} mbps={mbps}", device);
+    let ts = chrono::Local::now().format("%Y%m%d_%H%M%S");
+    let name = format!("recording_{ts}.mp4");
+    let picked = app
+        .dialog()
+        .file()
+        .set_file_name(&name)
+        .add_filter("视频", &["mp4"])
+        .blocking_save_file();
+    let Some(path) = picked else {
+        return Ok(None);
+    };
+    let path = path.into_path().map_err(|e| e.to_string())?;
+    let p = path.display().to_string();
+
+    if let Some(mut old) = state.session.lock().unwrap().take() {
+        old.child.stop();
+    }
+    let child = ScrcpyRecord::start(device.as_deref(), &p, mbps)?;
+    *state.session.lock().unwrap() = Some(RecordingSession { child, path: p.clone() });
+    Ok(Some(p))
+}
+
+#[tauri::command]
+async fn stop_recording(state: State<'_, RecordingState>) -> Result<Option<String>, String> {
+    log::info!("收到前端命令 stop_recording");
+    let Some(mut session) = state.session.lock().unwrap().take() else {
+        return Err("当前未在录制".to_string());
+    };
+    session.child.stop();
+    Ok(Some(session.path))
+}
+
+#[tauri::command]
+async fn mirror(device: Option<String>, mbps: u32) -> Result<(), String> {
+    log::info!("收到前端命令 mirror：device={:?} mbps={mbps}", device);
+    adb_mirror(device.as_deref(), mbps)
+}
+
+#[tauri::command]
+async fn app_alarm(device: Option<String>, package: String) -> Result<String, String> {
+    log::info!("收到前端命令 app_alarm：package={package}");
+    adb_app_alarm(device.as_deref(), &package)
+}
+
+#[tauri::command]
 async fn export_logs(app: AppHandle, text: String) -> Result<Option<String>, String> {
     log::info!("收到前端命令 export_logs，日志长度 {} 字节", text.len());
     use tauri_plugin_dialog::DialogExt;
@@ -288,6 +359,9 @@ pub fn run() {
             child: Mutex::new(None),
             generation: Arc::new(AtomicU64::new(0)),
         })
+        .manage(RecordingState {
+            session: Mutex::new(None),
+        })
         .invoke_handler(tauri::generate_handler![
             list_devices,
             start_logcat,
@@ -308,6 +382,11 @@ pub fn run() {
             clear_app_data,
             uninstall_app,
             device_info,
+            current_activity,
+            start_recording,
+            stop_recording,
+            mirror,
+            app_alarm,
             export_logs
         ])
         .run(tauri::generate_context!())

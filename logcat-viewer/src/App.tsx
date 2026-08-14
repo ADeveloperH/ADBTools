@@ -180,6 +180,33 @@ export default function App() {
     return await invoke<DeviceInfo>("device_info", { device: selectedDevice });
   };
 
+  const handleCurrentActivity = async () => {
+    return await invoke<string>("current_activity", { device: selectedDevice });
+  };
+
+  const handleStartRecording = async (mbps: number) => {
+    return await invoke<string | null>("start_recording", {
+      device: selectedDevice,
+      mbps,
+    });
+  };
+
+  const handleStopRecording = async () => {
+    return await invoke<string>("stop_recording");
+  };
+
+  const handleMirror = async (mbps: number) => {
+    await invoke("mirror", { device: selectedDevice, mbps });
+    return "投屏已启动，请在 scrcpy 窗口中操作";
+  };
+
+  const handleAppAlarm = async (pkg: string) => {
+    return await invoke<string>("app_alarm", {
+      device: selectedDevice,
+      package: pkg,
+    });
+  };
+
   // 挂载时加载应用清单。
   useEffect(() => {
     loadAppsList();
@@ -272,6 +299,11 @@ export default function App() {
         onScreenshot={handleScreenshot}
         onInstallApk={handleInstallApk}
         onDeviceInfo={handleDeviceInfo}
+        onCurrentActivity={handleCurrentActivity}
+        onStartRecording={handleStartRecording}
+        onStopRecording={handleStopRecording}
+        onMirror={handleMirror}
+        onAppAlarm={handleAppAlarm}
         onBack={() => setView("log")}
       />
     );
