@@ -19,5 +19,8 @@ artifacts/*
 # Local machine-specific configuration
 config/local*.json
 
+# 本地工具缓存（Rust/pnpm 重定向到工作区）
+.toolcache/
+
 # Project-config archives (may contain Firebase admin-sdk private keys)
 *.zip
