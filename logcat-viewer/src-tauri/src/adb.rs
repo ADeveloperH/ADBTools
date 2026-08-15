@@ -2,6 +2,73 @@
 
 use serde::Serialize;
 use std::process::{Child, ChildStderr, ChildStdout, Command, Stdio};
+use std::sync::OnceLock;
+
+static ADB_BIN: OnceLock<String> = OnceLock::new();
+static SCRCPY_BIN: OnceLock<String> = OnceLock::new();
+static SCRCPY_SERVER_BIN: OnceLock<String> = OnceLock::new();
+
+/// 初始化内置 adb / scrcpy 的路径（应用启动时调用）。
+/// 优先级：环境变量 > 内置二进制 > PATH 回退。
+pub fn init_binary_paths(resource_dir: Option<std::path::PathBuf>) {
+    let os = std::env::consts::OS;
+    let platform = if os == "windows" { "windows" } else { "macos" };
+    let adb_name = if os == "windows" { "adb.exe" } else { "adb" };
+    let scrcpy_name = if os == "windows" { "scrcpy.exe" } else { "scrcpy" };
+
+    let adb = std::env::var("ADB_PATH")
+        .ok()
+        .filter(|p| !p.is_empty())
+        .or_else(|| {
+            resource_dir
+                .as_ref()
+                .map(|d| d.join("bin").join(platform).join(adb_name))
+                .filter(|p| p.exists())
+                .map(|p| p.display().to_string())
+        })
+        .unwrap_or_else(|| "adb".to_string());
+    let _ = ADB_BIN.set(adb);
+
+    let scrcpy = std::env::var("SCRCPY_PATH")
+        .ok()
+        .filter(|p| !p.is_empty())
+        .or_else(|| {
+            resource_dir
+                .as_ref()
+                .map(|d| d.join("bin").join(platform).join(scrcpy_name))
+                .filter(|p| p.exists())
+                .map(|p| p.display().to_string())
+        })
+        .unwrap_or_else(|| "scrcpy".to_string());
+    let _ = SCRCPY_BIN.set(scrcpy);
+
+    let server = std::path::Path::new(SCRCPY_BIN.get().unwrap())
+        .parent()
+        .map(|d| d.join("scrcpy-server"))
+        .filter(|p| p.exists())
+        .map(|p| p.display().to_string())
+        .unwrap_or_default();
+    let _ = SCRCPY_SERVER_BIN.set(server);
+}
+
+fn adb_path() -> String {
+    ADB_BIN.get().cloned().unwrap_or_else(|| "adb".to_string())
+}
+
+fn scrcpy_server_path() -> String {
+    SCRCPY_SERVER_BIN.get().cloned().unwrap_or_default()
+}
+
+/// 构造 scrcpy 命令（带内置 adb / server 的环境变量）。
+fn scrcpy_command() -> Command {
+    let mut cmd = Command::new(scrcpy_path());
+    cmd.env("ADB", adb_path());
+    let server = scrcpy_server_path();
+    if !server.is_empty() {
+        cmd.env("SCRCPY_SERVER_PATH", &server);
+    }
+    cmd
+}
 
 /// 一台连接的设备（USB 或 WiFi）。
 #[derive(Debug, Clone, Serialize)]
@@ -17,7 +84,7 @@ pub struct Device {
 /// 执行 `adb devices -l` 并解析结果。
 pub fn list_devices() -> Result<Vec<Device>, String> {
     log::debug!("执行 adb devices -l");
-    let output = Command::new("adb")
+    let output = Command::new(adb_path())
         .args(["devices", "-l"])
         .output()
         .map_err(|e| format!("无法执行 adb，请确认已安装 Android Platform-Tools：{e}"))?;
@@ -73,7 +140,7 @@ pub fn list_devices() -> Result<Vec<Device>, String> {
 /// 执行一个 adb 命令并捕获输出（用于 pair / connect / disconnect 等短命令）。
 fn run_adb_capture(args: &[&str]) -> Result<String, String> {
     log::debug!("执行 adb {}", args.join(" "));
-    let output = Command::new("adb")
+    let output = Command::new(adb_path())
         .args(args)
         .output()
         .map_err(|e| format!("无法执行 adb：{e}"))?;
@@ -95,7 +162,7 @@ fn run_adb_capture(args: &[&str]) -> Result<String, String> {
 /// 清除指定设备的 logcat 缓冲区。
 pub fn clear_log(device: Option<&str>) -> Result<(), String> {
     log::info!("清空 logcat 缓冲区，设备：{:?}", device);
-    let mut cmd = Command::new("adb");
+    let mut cmd = Command::new(adb_path());
     if let Some(d) = device {
         cmd.arg("-s").arg(d);
     }
@@ -141,7 +208,7 @@ pub struct LogcatProcess {
 impl LogcatProcess {
     /// 启动 `adb [-s <device>] logcat -v threadtime [-b <buffer>]`。
     pub fn start(device: Option<&str>, buffer: Option<&str>) -> Result<Self, String> {
-        let mut cmd = Command::new("adb");
+        let mut cmd = Command::new(adb_path());
         if let Some(d) = device {
             cmd.arg("-s").arg(d);
         }
@@ -204,7 +271,7 @@ pub fn generate_pairing() -> PairingInfo {
 
 /// 通过 mDNS 查找正在等待配对的设备地址（ip:port），找不到返回 None。
 pub fn mdns_pairing_address() -> Result<Option<String>, String> {
-    let output = Command::new("adb")
+    let output = Command::new(adb_path())
         .args(["mdns", "services"])
         .output()
         .map_err(|e| format!("无法执行 adb mdns services：{e}"))?;
@@ -225,7 +292,7 @@ pub fn mdns_pairing_address() -> Result<Option<String>, String> {
 /// 解析指定包名当前运行的 PID 列表（`adb shell pidof`）。
 pub fn resolve_pids(device: Option<&str>, package: &str) -> Result<Vec<String>, String> {
     log::info!("解析包名 PID：device={:?} package={package}", device);
-    let mut cmd = Command::new("adb");
+    let mut cmd = Command::new(adb_path());
     if let Some(d) = device {
         cmd.arg("-s").arg(d);
     }
@@ -303,7 +370,7 @@ pub fn open_backdoor(
 ) -> Result<String, String> {
     let component = format!("{package}/{activity}");
     log::info!("打开后门：device={:?} component={component}", device);
-    let mut cmd = Command::new("adb");
+    let mut cmd = Command::new(adb_path());
     if let Some(d) = device {
         cmd.arg("-s").arg(d);
     }
@@ -325,7 +392,7 @@ pub fn open_backdoor(
 /// 重启应用：force-stop 后通过 Launcher 启动。
 pub fn restart_app(device: Option<&str>, package: &str) -> Result<(), String> {
     log::info!("重启应用：device={:?} package={package}", device);
-    let mut stop = Command::new("adb");
+    let mut stop = Command::new(adb_path());
     if let Some(d) = device {
         stop.arg("-s").arg(d);
     }
@@ -337,7 +404,7 @@ pub fn restart_app(device: Option<&str>, package: &str) -> Result<(), String> {
         return Err(String::from_utf8_lossy(&out.stderr).trim().to_string());
     }
 
-    let mut launch = Command::new("adb");
+    let mut launch = Command::new(adb_path());
     if let Some(d) = device {
         launch.arg("-s").arg(d);
     }
@@ -363,7 +430,7 @@ pub fn restart_app(device: Option<&str>, package: &str) -> Result<(), String> {
 /// 截图，返回 PNG 原始字节（`adb exec-out screencap -p`）。
 pub fn screencap_png(device: Option<&str>) -> Result<Vec<u8>, String> {
     log::info!("截图：device={:?}", device);
-    let mut cmd = Command::new("adb");
+    let mut cmd = Command::new(adb_path());
     if let Some(d) = device {
         cmd.arg("-s").arg(d);
     }
@@ -382,7 +449,7 @@ pub fn screencap_png(device: Option<&str>) -> Result<Vec<u8>, String> {
 /// 覆盖安装 APK。
 pub fn install_apk(device: Option<&str>, path: &str) -> Result<String, String> {
     log::info!("安装 APK：device={:?} path={path}", device);
-    let mut cmd = Command::new("adb");
+    let mut cmd = Command::new(adb_path());
     if let Some(d) = device {
         cmd.arg("-s").arg(d);
     }
@@ -404,7 +471,7 @@ pub fn install_apk(device: Option<&str>, path: &str) -> Result<String, String> {
 /// 清除应用数据。
 pub fn clear_app_data(device: Option<&str>, package: &str) -> Result<String, String> {
     log::info!("清除应用数据：device={:?} package={package}", device);
-    let mut cmd = Command::new("adb");
+    let mut cmd = Command::new(adb_path());
     if let Some(d) = device {
         cmd.arg("-s").arg(d);
     }
@@ -426,7 +493,7 @@ pub fn clear_app_data(device: Option<&str>, package: &str) -> Result<String, Str
 /// 卸载应用。
 pub fn uninstall_app(device: Option<&str>, package: &str) -> Result<String, String> {
     log::info!("卸载应用：device={:?} package={package}", device);
-    let mut cmd = Command::new("adb");
+    let mut cmd = Command::new(adb_path());
     if let Some(d) = device {
         cmd.arg("-s").arg(d);
     }
@@ -461,7 +528,7 @@ pub struct DeviceInfo {
 }
 
 fn adb_shell_output(device: Option<&str>, args: &[&str]) -> Result<String, String> {
-    let mut cmd = Command::new("adb");
+    let mut cmd = Command::new(adb_path());
     if let Some(d) = device {
         cmd.arg("-s").arg(d);
     }
@@ -553,21 +620,9 @@ fn parse_resumed_activity(line: &str) -> Option<(String, String)> {
     None
 }
 
-/// 定位 scrcpy 可执行文件（开发用环境变量/PATH，分发时改为内置路径）。
+/// 定位 scrcpy 可执行文件（优先内置，其次 PATH 回退）。
 fn scrcpy_path() -> String {
-    if let Ok(p) = std::env::var("SCRCPY_PATH") {
-        if !p.is_empty() {
-            return p;
-        }
-    }
-    #[cfg(target_os = "macos")]
-    {
-        let p = "/opt/homebrew/bin/scrcpy";
-        if std::path::Path::new(p).exists() {
-            return p.to_string();
-        }
-    }
-    "scrcpy".to_string()
+    SCRCPY_BIN.get().cloned().unwrap_or_else(|| "scrcpy".to_string())
 }
 
 /// 一个运行中的 scrcpy 无头录屏子进程。
@@ -580,7 +635,7 @@ impl ScrcpyRecord {
         use std::io::Read;
         let br = format!("{mbps}M");
         log::info!("开始 scrcpy 录屏：device={:?} output={output} bitrate={br}", device);
-        let mut cmd = Command::new(scrcpy_path());
+        let mut cmd = scrcpy_command();
         if let Some(d) = device {
             cmd.arg("-s").arg(d);
         }
@@ -630,7 +685,7 @@ impl ScrcpyRecord {
 pub fn mirror(device: Option<&str>, mbps: u32) -> Result<(), String> {
     let br = format!("{mbps}M");
     log::info!("启动 scrcpy 投屏：device={:?} bitrate={br}", device);
-    let mut cmd = Command::new(scrcpy_path());
+    let mut cmd = scrcpy_command();
     if let Some(d) = device {
         cmd.arg("-s").arg(d);
     }

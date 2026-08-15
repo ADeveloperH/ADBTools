@@ -91,6 +91,14 @@ pnpm tauri build
 
 遇到问题时，把日志文件内容（或终端输出）发出来即可定位。正式发布前可把日志级别调低（`lib.rs` 里 `.level(log::LevelFilter::Debug)` 改为 `Info`）并移除不必要的日志。
 
+## 内置 adb / scrcpy（免安装分发）
+
+应用内置了 adb 与 scrcpy 二进制（`src-tauri/bin/<平台>/`），运行时优先使用内置版本、找不到时回退到系统 PATH，因此终端用户无需自行安装 Android Platform-Tools 或 scrcpy。
+
+- 生成内置二进制：`bash scripts/bundle-binaries.sh`（macOS 依赖 brew 的 scrcpy 与 dylibbundler）
+- `src-tauri/bin/` 已加入 `.gitignore`，二进制不提交仓库，由脚本按需生成
+- Windows 平台需在 Windows 机器上放置 `adb.exe` 与 `scrcpy-win64`（含 scrcpy-server 与 dll）
+
 ## 应用清单（远程更新）
 
 「应用」下拉框的清单采用三级兜底：远程 → 本地缓存 → 内置默认。

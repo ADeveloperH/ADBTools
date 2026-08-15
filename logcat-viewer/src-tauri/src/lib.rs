@@ -4,7 +4,7 @@ use std::io::{BufRead, BufReader};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 use adb::{
     app_alarm as adb_app_alarm, clear_app_data as adb_clear_app_data, clear_log as adb_clear_log,
@@ -361,6 +361,11 @@ pub fn run() {
         })
         .manage(RecordingState {
             session: Mutex::new(None),
+        })
+        .setup(|app| {
+            let resource_dir = app.path().resource_dir().ok();
+            adb::init_binary_paths(resource_dir);
+            Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             list_devices,

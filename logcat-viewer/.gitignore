@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# 内置的 adb / scrcpy 二进制（由 scripts/bundle-binaries.sh 生成，不提交）
+src-tauri/bin/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
