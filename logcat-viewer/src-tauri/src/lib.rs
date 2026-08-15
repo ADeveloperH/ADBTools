@@ -7,7 +7,8 @@ use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter, Manager, State};
 
 use adb::{
-    app_alarm as adb_app_alarm, clear_app_data as adb_clear_app_data, clear_log as adb_clear_log,
+    app_alarm as adb_app_alarm, app_performance as adb_app_performance,
+    clear_app_data as adb_clear_app_data, clear_log as adb_clear_log,
     connect as adb_connect, current_activity as adb_current_activity,
     device_info as adb_device_info, disconnect as adb_disconnect,
     fetch_remote_apps as adb_fetch_remote_apps, generate_pairing as adb_generate_pairing,
@@ -315,6 +316,12 @@ async fn app_alarm(device: Option<String>, package: String) -> Result<String, St
 }
 
 #[tauri::command]
+async fn app_performance(device: Option<String>, package: String) -> Result<String, String> {
+    log::info!("收到前端命令 app_performance：package={package}");
+    adb_app_performance(device.as_deref(), &package)
+}
+
+#[tauri::command]
 async fn export_logs(app: AppHandle, text: String) -> Result<Option<String>, String> {
     log::info!("收到前端命令 export_logs，日志长度 {} 字节", text.len());
     use tauri_plugin_dialog::DialogExt;
@@ -392,6 +399,7 @@ pub fn run() {
             stop_recording,
             mirror,
             app_alarm,
+            app_performance,
             export_logs
         ])
         .run(tauri::generate_context!())

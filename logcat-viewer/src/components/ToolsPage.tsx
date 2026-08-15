@@ -11,6 +11,7 @@ interface Props {
   onClearData: (pkg: string) => Promise<string>;
   onUninstall: (pkg: string) => Promise<string>;
   onAppAlarm: (pkg: string) => Promise<string>;
+  onAppPerformance: (pkg: string) => Promise<string>;
   onScreenshot: () => Promise<string>;
   onInstallApk: () => Promise<string>;
   onDeviceInfo: () => Promise<DeviceInfo>;
@@ -181,6 +182,12 @@ export function ToolsPage(props: Props) {
             onClick={() => runOutput(() => props.onAppAlarm(pkg), "应用 Alarm")}
           >
             查看 Alarm
+          </button>
+          <button
+            disabled={!appReady || busy}
+            onClick={() => runOutput(() => props.onAppPerformance(pkg), "性能信息")}
+          >
+            性能
           </button>
         </div>
       </section>

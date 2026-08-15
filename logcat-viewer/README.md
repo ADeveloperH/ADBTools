@@ -27,7 +27,7 @@
 
 - [ ] 已保存过滤器（类似 AS 的 filter configuration）
 - [ ] 日志分页与跳转、点击展开单行
-- [ ] 打包自带 adb 二进制（终端用户免装 Platform-Tools）
+- [ ] Windows 优雅停止录屏（当前为强杀，可能损坏文件，需改为发送 Ctrl+C 信号）
 - [ ] macOS 签名/公证、Windows 签名（分发必需）
 
 ## 架构
@@ -96,8 +96,8 @@ pnpm tauri build
 应用内置了 adb 与 scrcpy 二进制（`src-tauri/bin/<平台>/`），运行时优先使用内置版本、找不到时回退到系统 PATH，因此终端用户无需自行安装 Android Platform-Tools 或 scrcpy。
 
 - 生成内置二进制：`bash scripts/bundle-binaries.sh`（macOS 依赖 brew 的 scrcpy 与 dylibbundler）
+- Windows 生成内置二进制：在 Windows 机器上运行 `scripts/bundle-binaries.ps1`（自动下载 scrcpy-win64 与 adb）
 - `src-tauri/bin/` 已加入 `.gitignore`，二进制不提交仓库，由脚本按需生成
-- Windows 平台需在 Windows 机器上放置 `adb.exe` 与 `scrcpy-win64`（含 scrcpy-server 与 dll）
 
 ## 应用清单（远程更新）
 

@@ -706,3 +706,57 @@ pub fn app_alarm(device: Option<&str>, package: &str) -> Result<String, String> 
         Ok(lines.join("\n"))
     }
 }
+
+/// 应用性能信息（内存 + 帧率/渲染快照）。
+pub fn app_performance(device: Option<&str>, package: &str) -> Result<String, String> {
+    log::info!("查看应用性能：device={:?} package={package}", device);
+    let mut out = String::new();
+
+    // 内存
+    match adb_shell_output(device, &["shell", "dumpsys", "meminfo", package]) {
+        Ok(mem) => {
+            let lines: Vec<&str> = mem
+                .lines()
+                .filter(|l| {
+                    let t = l.trim_start();
+                    t.starts_with("TOTAL")
+                        || l.contains("Native Heap")
+                        || l.contains("Dalvik Heap")
+                        || l.contains("Java Heap")
+                })
+                .collect();
+            out.push_str("【内存】\n");
+            if lines.is_empty() {
+                out.push_str("（无数据，应用可能未运行）\n");
+            } else {
+                out.push_str(&lines.join("\n"));
+            }
+        }
+        Err(e) => out.push_str(&format!("【内存】获取失败：{e}\n")),
+    }
+
+    // 帧率/渲染
+    match adb_shell_output(device, &["shell", "dumpsys", "gfxinfo", package]) {
+        Ok(gfx) => {
+            let lines: Vec<&str> = gfx
+                .lines()
+                .filter(|l| {
+                    l.contains("Total frames rendered")
+                        || l.contains("Janky frames")
+                        || l.contains("percentile")
+                        || l.contains("Number Missed Vsync")
+                        || l.contains("Number High input latency")
+                })
+                .collect();
+            out.push_str("\n【帧率/渲染】\n");
+            if lines.is_empty() {
+                out.push_str("（无数据，应用可能未渲染过画面）\n");
+            } else {
+                out.push_str(&lines.join("\n"));
+            }
+        }
+        Err(e) => out.push_str(&format!("\n【帧率/渲染】获取失败：{e}\n")),
+    }
+
+    Ok(out)
+}

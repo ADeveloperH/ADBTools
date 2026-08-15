@@ -227,6 +227,13 @@ export default function App() {
     });
   };
 
+  const handleAppPerformance = async (pkg: string) => {
+    return await invoke<string>("app_performance", {
+      device: selectedDevice,
+      package: pkg,
+    });
+  };
+
   // 挂载时加载应用清单。
   useEffect(() => {
     loadAppsList();
@@ -324,6 +331,7 @@ export default function App() {
         onStopRecording={handleStopRecording}
         onMirror={handleMirror}
         onAppAlarm={handleAppAlarm}
+        onAppPerformance={handleAppPerformance}
         onBack={() => setView("log")}
       />
     );
