@@ -2,10 +2,16 @@ import { useState } from "react";
 import { DEFAULT_BACKDOOR } from "../apps";
 import type { AppInfo } from "../apps";
 import type { Favorite, ListKind, Prefs } from "../hooks/usePrefs";
+import type { TestCasesStore } from "../hooks/useTestCasesStore";
+import { TestCaseManager } from "./TestCaseManager";
+
+export type ManageTab = "apps" | "search" | "tags" | "testcases";
 
 interface Props {
   prefs: Prefs;
   effectiveApps: AppInfo[];
+  testCaseStore: TestCasesStore;
+  initialTab?: ManageTab;
   onAddApp: (name: string, pkg: string) => void;
   onRemoveApp: (pkg: string) => void;
   onSetAppOrder: (order: string[]) => void;
@@ -24,7 +30,7 @@ interface Props {
 }
 
 export function ManagePage(props: Props) {
-  const [tab, setTab] = useState<"apps" | "search" | "tags">("apps");
+  const [tab, setTab] = useState<ManageTab>(props.initialTab ?? "apps");
   const [appName, setAppName] = useState("");
   const [appPkg, setAppPkg] = useState("");
   const [appBackdoor, setAppBackdoor] = useState("");
@@ -86,6 +92,12 @@ export function ManagePage(props: Props) {
         </button>
         <button className={tab === "tags" ? "active" : ""} onClick={() => setTab("tags")}>
           Tag
+        </button>
+        <button
+          className={tab === "testcases" ? "active" : ""}
+          onClick={() => setTab("testcases")}
+        >
+          测试用例
         </button>
       </div>
 
@@ -253,6 +265,10 @@ export function ManagePage(props: Props) {
           onRemoveHistory={(v) => props.onRemoveHistory("tags", v)}
           onClearHistory={() => props.onClearHistory("tags")}
         />
+      )}
+
+      {tab === "testcases" && (
+        <TestCaseManager store={props.testCaseStore} apps={props.effectiveApps} />
       )}
     </div>
   );

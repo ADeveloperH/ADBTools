@@ -41,6 +41,8 @@ export interface UseLogcatResult {
   clear: () => Promise<void>;
   exportLogs: () => Promise<void>;
   entries: LogEntry[];
+  /** 原始缓冲（未经过滤），供测试用例引擎使用 */
+  allEntries: LogEntry[];
   filters: FilterState;
   setFilters: (f: FilterState) => void;
   error: string | null;
@@ -68,6 +70,9 @@ export function useLogcat(): UseLogcatResult {
   const idRef = useRef(0);
   const pausedRef = useRef(false);
   const runningRef = useRef(false);
+  const manualStopRef = useRef(false);
+  const selectedDeviceRef = useRef<string | null>(null);
+  const bufferForResumeRef = useRef(buffer);
 
   useEffect(() => {
     pausedRef.current = paused;
@@ -76,6 +81,14 @@ export function useLogcat(): UseLogcatResult {
   useEffect(() => {
     runningRef.current = running;
   }, [running]);
+
+  useEffect(() => {
+    selectedDeviceRef.current = selectedDevice;
+  }, [selectedDevice]);
+
+  useEffect(() => {
+    bufferForResumeRef.current = buffer;
+  }, [buffer]);
 
   const refreshDevices = useCallback(async () => {
     log.info("刷新设备列表");
@@ -96,6 +109,7 @@ export function useLogcat(): UseLogcatResult {
 
   const start = useCallback(async () => {
     if (!selectedDevice) return;
+    manualStopRef.current = false;
     log.info(`开始抓取日志：device=${selectedDevice} buffer=${buffer}`);
     setError(null);
     bufferRef.current = [];
@@ -116,6 +130,7 @@ export function useLogcat(): UseLogcatResult {
   }, [selectedDevice, buffer]);
 
   const stop = useCallback(async () => {
+    manualStopRef.current = true;
     log.info("停止抓取日志");
     try {
       await invoke("stop_logcat");
@@ -159,7 +174,23 @@ export function useLogcat(): UseLogcatResult {
       else cleanups.push(fn);
     });
 
-    listen("logcat-stopped", () => setRunning(false)).then((fn) => {
+    listen("logcat-stopped", () => {
+      setRunning(false);
+      // 非手动停止时自动重连（如 WiFi adb 掉线）
+      if (manualStopRef.current) return;
+      const device = selectedDeviceRef.current;
+      if (!device) return;
+      const buf = bufferForResumeRef.current;
+      setTimeout(() => {
+        if (manualStopRef.current || disposed) return;
+        invoke("start_logcat", {
+          device,
+          buffer: buf === "all" ? null : buf,
+        })
+          .then(() => setRunning(true))
+          .catch((e) => log.error(`自动重连失败：${String(e)}`));
+      }, 2000);
+    }).then((fn) => {
       if (disposed) fn();
       else cleanups.push(fn);
     });
@@ -293,6 +324,7 @@ export function useLogcat(): UseLogcatResult {
     clear,
     exportLogs,
     entries: filtered,
+    allEntries: entries,
     filters,
     setFilters,
     error,

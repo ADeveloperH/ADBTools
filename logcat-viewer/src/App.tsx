@@ -3,9 +3,11 @@ import { invoke } from "@tauri-apps/api/core";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { useLogcat } from "./hooks/useLogcat";
 import { usePrefs } from "./hooks/usePrefs";
+import { useTestCasesStore } from "./hooks/useTestCasesStore";
 import { HistoryInput } from "./components/HistoryInput";
 import { LogList } from "./components/LogList";
-import { ManagePage } from "./components/ManagePage";
+import { ManagePage, type ManageTab } from "./components/ManagePage";
+import { TestCaseSidebar } from "./components/TestCaseSidebar";
 import { ToolsPage } from "./components/ToolsPage";
 import { WifiPanel } from "./components/WifiPanel";
 import { BUILTIN_APPS, DEFAULT_BACKDOOR, loadApps } from "./apps";
@@ -40,6 +42,7 @@ export default function App() {
     clear,
     exportLogs,
     entries,
+    allEntries,
     filters,
     setFilters,
     error,
@@ -54,6 +57,9 @@ export default function App() {
   const [selectedPackage, setSelectedPackage] = useState("");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [copied, setCopied] = useState(false);
+  const [showCases, setShowCases] = useState(false);
+  const [manageTab, setManageTab] = useState<ManageTab>("apps");
+  const testCaseStore = useTestCasesStore();
 
   const selectedEntry = entries.find((e) => e.id === selectedId) ?? null;
   const [scrollRequest, setScrollRequest] = useState<{
@@ -292,11 +298,18 @@ export default function App() {
     setSelectedId((prev) => (prev === id ? null : id));
   };
 
+  const locateEntry = (id: number) => {
+    setSelectedId(id);
+    setScrollRequest({ id, seq: Date.now() });
+  };
+
   if (view === "manage") {
     return (
       <ManagePage
         prefs={prefs.prefs}
         effectiveApps={effectiveApps}
+        testCaseStore={testCaseStore}
+        initialTab={manageTab}
         onAddApp={(name, pkg) => prefs.addApp({ name, package: pkg })}
         onRemoveApp={(pkg) => prefs.removeApp(pkg)}
         onAddFavorite={(kind, v, d) => prefs.addFavorite(kind, v, d)}
@@ -406,7 +419,20 @@ export default function App() {
           {copied && <span className="count">已复制 ✓</span>}
           <button onClick={() => setShowWifi(!showWifi)}>WiFi 连接</button>
           <button onClick={() => setView("tools")}>工具</button>
-          <button onClick={() => setView("manage")}>设置</button>
+          <button
+            className={showCases ? "active" : ""}
+            onClick={() => setShowCases(!showCases)}
+          >
+            测试用例
+          </button>
+          <button
+            onClick={() => {
+              setManageTab("apps");
+              setView("manage");
+            }}
+          >
+            设置
+          </button>
         </div>
 
         <div className="toolbar-row">
@@ -463,12 +489,29 @@ export default function App() {
         {showWifi && <WifiPanel onChanged={refreshDevices} />}
       </div>
 
-      <LogList
-        entries={entries}
-        selectedId={selectedId}
-        onSelect={handleSelect}
-        scrollRequest={scrollRequest}
-      />
+      <div className="log-main">
+        <LogList
+          entries={entries}
+          selectedId={selectedId}
+          onSelect={handleSelect}
+          scrollRequest={scrollRequest}
+        />
+        {showCases && (
+          <TestCaseSidebar
+            store={testCaseStore}
+            allEntries={allEntries}
+            scopePkg={selectedPackage}
+            pidFilter={filters.pid}
+            apps={effectiveApps}
+            onLocate={locateEntry}
+            onManage={() => {
+              setManageTab("testcases");
+              setView("manage");
+            }}
+            onClose={() => setShowCases(false)}
+          />
+        )}
+      </div>
 
       {error && <div className="error">{error}</div>}
     </div>

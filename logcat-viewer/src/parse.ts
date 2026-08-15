@@ -17,7 +17,8 @@ export function parseLogLine(line: string, id: number): LogEntry | null {
   let message = rest;
   const idx = rest.indexOf(": ");
   if (idx >= 0) {
-    tag = rest.slice(0, idx);
+    // tag 列可能带尾部空格（logcat 对齐），需 trim 后再比较
+    tag = rest.slice(0, idx).trim();
     message = rest.slice(idx + 2);
   }
   return {
