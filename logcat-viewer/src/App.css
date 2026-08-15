@@ -498,6 +498,32 @@ button.active {
   padding-left: 6px;
 }
 
+.manage-filter-item.editing {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.manage-filter-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.manage-filter-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.manage-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .tools-actions {
   display: flex;
   gap: 10px;

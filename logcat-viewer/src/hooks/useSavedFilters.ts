@@ -59,5 +59,44 @@ export function useSavedFilters() {
     setSavedFilters((list) => list.filter((f) => f.id !== id));
   }, []);
 
-  return { savedFilters, saveFilter, deleteFilter };
+  const renameFilter = useCallback((id: string, name: string) => {
+    const n = name.trim();
+    if (!n) return;
+    setSavedFilters((list) =>
+      list.map((f) => (f.id === id ? { ...f, name: n } : f)),
+    );
+  }, []);
+
+  const updateFilter = useCallback((id: string, filters: FilterState) => {
+    setSavedFilters((list) =>
+      list.map((f) => (f.id === id ? { ...f, filters } : f)),
+    );
+  }, []);
+
+  const moveFilter = useCallback((fromIndex: number, toIndex: number) => {
+    setSavedFilters((list) => {
+      if (
+        fromIndex < 0 ||
+        fromIndex >= list.length ||
+        toIndex < 0 ||
+        toIndex >= list.length ||
+        fromIndex === toIndex
+      ) {
+        return list;
+      }
+      const next = [...list];
+      const [item] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, item);
+      return next;
+    });
+  }, []);
+
+  return {
+    savedFilters,
+    saveFilter,
+    deleteFilter,
+    renameFilter,
+    updateFilter,
+    moveFilter,
+  };
 }

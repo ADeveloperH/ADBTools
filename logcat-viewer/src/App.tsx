@@ -13,19 +13,9 @@ import { ToolsPage } from "./components/ToolsPage";
 import { WifiPanel } from "./components/WifiPanel";
 import { BUILTIN_APPS, DEFAULT_BACKDOOR, loadApps } from "./apps";
 import type { AppInfo } from "./apps";
-import { BUFFERS, LEVELS } from "./types";
+import { BUFFERS, LEVELS, LEVEL_LABELS } from "./types";
 import type { DeviceInfo, LogLevel, ScrollCommand } from "./types";
 import "./App.css";
-
-const LEVEL_LABELS: Record<LogLevel, string> = {
-  V: "Verbose",
-  D: "Debug",
-  I: "Info",
-  W: "Warn",
-  E: "Error",
-  F: "Fatal",
-  A: "Assert",
-};
 
 export default function App() {
   const {
@@ -61,7 +51,14 @@ export default function App() {
   const [showCases, setShowCases] = useState(false);
   const [manageTab, setManageTab] = useState<ManageTab>("apps");
   const testCaseStore = useTestCasesStore();
-  const { savedFilters, saveFilter, deleteFilter } = useSavedFilters();
+  const {
+    savedFilters,
+    saveFilter,
+    deleteFilter,
+    renameFilter,
+    updateFilter,
+    moveFilter,
+  } = useSavedFilters();
   const [activeFilterId, setActiveFilterId] = useState("");
   const [filterName, setFilterName] = useState("");
   const [jumpInput, setJumpInput] = useState("");
@@ -367,6 +364,12 @@ export default function App() {
         onSetAppOrder={(order) => prefs.setAppOrder(order)}
         onSetBackdoorOverride={(pkg, a) => prefs.setBackdoorOverride(pkg, a)}
         onMoveFavorite={(kind, from, to) => prefs.moveFavorite(kind, from, to)}
+        savedFilters={savedFilters}
+        onSaveFilter={saveFilter}
+        onRenameFilter={renameFilter}
+        onUpdateFilter={updateFilter}
+        onDeleteFilter={deleteFilter}
+        onMoveFilter={moveFilter}
         onBack={() => setView("log")}
       />
     );

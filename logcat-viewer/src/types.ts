@@ -41,6 +41,16 @@ export interface Device {
 
 export const LEVELS: LogLevel[] = ["V", "D", "I", "W", "E", "F", "A"];
 
+export const LEVEL_LABELS: Record<LogLevel, string> = {
+  V: "Verbose",
+  D: "Debug",
+  I: "Info",
+  W: "Warn",
+  E: "Error",
+  F: "Fatal",
+  A: "Assert",
+};
+
 export const LEVEL_SEVERITY: Record<LogLevel, number> = {
   V: 0,
   D: 1,

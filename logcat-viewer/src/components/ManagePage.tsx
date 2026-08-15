@@ -2,10 +2,13 @@ import { useState } from "react";
 import { DEFAULT_BACKDOOR } from "../apps";
 import type { AppInfo } from "../apps";
 import type { Favorite, ListKind, Prefs } from "../hooks/usePrefs";
+import type { SavedFilter } from "../hooks/useSavedFilters";
 import type { TestCasesStore } from "../hooks/useTestCasesStore";
+import type { FilterState } from "../types";
+import { FilterManager } from "./FilterManager";
 import { TestCaseManager } from "./TestCaseManager";
 
-export type ManageTab = "apps" | "search" | "tags" | "testcases";
+export type ManageTab = "apps" | "search" | "tags" | "testcases" | "filters";
 
 interface Props {
   prefs: Prefs;
@@ -26,6 +29,12 @@ interface Props {
   onMoveFavorite: (kind: ListKind, fromIndex: number, toIndex: number) => void;
   onRemoveHistory: (kind: ListKind, value: string) => void;
   onClearHistory: (kind: ListKind) => void;
+  savedFilters: SavedFilter[];
+  onSaveFilter: (name: string, filters: FilterState) => string;
+  onRenameFilter: (id: string, name: string) => void;
+  onUpdateFilter: (id: string, filters: FilterState) => void;
+  onDeleteFilter: (id: string) => void;
+  onMoveFilter: (fromIndex: number, toIndex: number) => void;
   onBack: () => void;
 }
 
@@ -98,6 +107,12 @@ export function ManagePage(props: Props) {
           onClick={() => setTab("testcases")}
         >
           测试用例
+        </button>
+        <button
+          className={tab === "filters" ? "active" : ""}
+          onClick={() => setTab("filters")}
+        >
+          过滤器
         </button>
       </div>
 
@@ -269,6 +284,18 @@ export function ManagePage(props: Props) {
 
       {tab === "testcases" && (
         <TestCaseManager store={props.testCaseStore} apps={props.effectiveApps} />
+      )}
+
+      {tab === "filters" && (
+        <FilterManager
+          savedFilters={props.savedFilters}
+          apps={props.effectiveApps}
+          onSave={props.onSaveFilter}
+          onRename={props.onRenameFilter}
+          onUpdate={props.onUpdateFilter}
+          onDelete={props.onDeleteFilter}
+          onMove={props.onMoveFilter}
+        />
       )}
     </div>
   );
