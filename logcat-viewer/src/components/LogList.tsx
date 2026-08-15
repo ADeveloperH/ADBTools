@@ -3,7 +3,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import type { LogEntry, LogLevel } from "../types";
 
 const ROW_HEIGHT = 20;
-const LONG_THRESHOLD = 400;
+const LONG_THRESHOLD = 1200;
 
 const LEVEL_COLORS: Record<LogLevel, string> = {
   V: "#9e9e9e",
@@ -86,6 +86,16 @@ export function LogList({ entries, selectedId, onSelect, scrollRequest }: Props)
               data-index={vi.index}
               className={selected ? "log-row selected" : "log-row"}
               onClick={() => onSelect(entry.id)}
+              onDoubleClick={() => {
+                if (isLong) toggleExpand(entry.id);
+              }}
+              title={
+                isLong
+                  ? isExpanded
+                    ? "双击收起"
+                    : `双击展开完整日志（${entry.raw.length} 字符）`
+                  : undefined
+              }
               style={{
                 position: "absolute",
                 top: 0,
@@ -98,7 +108,7 @@ export function LogList({ entries, selectedId, onSelect, scrollRequest }: Props)
                 {isLong && (
                   <button
                     className="log-expand-btn"
-                    title={isExpanded ? "收起" : "展开"}
+                    title={isExpanded ? "收起" : "展开完整日志"}
                     onClick={(e) => {
                       e.stopPropagation();
                       toggleExpand(entry.id);
@@ -121,7 +131,11 @@ export function LogList({ entries, selectedId, onSelect, scrollRequest }: Props)
               </span>
               <span
                 className={clamped ? "log-msg clamped" : "log-msg"}
-                title={clamped ? entry.raw : undefined}
+                title={
+                  clamped
+                    ? `双击展开完整日志（${entry.raw.length} 字符）`
+                    : undefined
+                }
               >
                 {entry.message}
               </span>

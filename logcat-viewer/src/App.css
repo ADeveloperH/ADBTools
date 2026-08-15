@@ -241,16 +241,18 @@ button.active {
 .log-expand-btn {
   background: transparent;
   border: none;
-  color: var(--text-dim);
+  color: #56a8f5;
   cursor: pointer;
   padding: 0;
   font-size: 12px;
   line-height: 20px;
   width: 16px;
+  border-radius: 3px;
 }
 
 .log-expand-btn:hover {
-  color: var(--text);
+  background: rgba(86, 168, 245, 0.25);
+  color: #fff;
 }
 
 .log-row:hover {
