@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { useLogcat } from "./hooks/useLogcat";
 import { usePrefs } from "./hooks/usePrefs";
+import { useSavedFilters } from "./hooks/useSavedFilters";
 import { useTestCasesStore } from "./hooks/useTestCasesStore";
 import { HistoryInput } from "./components/HistoryInput";
 import { LogList } from "./components/LogList";
@@ -13,7 +14,7 @@ import { WifiPanel } from "./components/WifiPanel";
 import { BUILTIN_APPS, DEFAULT_BACKDOOR, loadApps } from "./apps";
 import type { AppInfo } from "./apps";
 import { BUFFERS, LEVELS } from "./types";
-import type { DeviceInfo, LogLevel } from "./types";
+import type { DeviceInfo, LogLevel, ScrollCommand } from "./types";
 import "./App.css";
 
 const LEVEL_LABELS: Record<LogLevel, string> = {
@@ -60,12 +61,14 @@ export default function App() {
   const [showCases, setShowCases] = useState(false);
   const [manageTab, setManageTab] = useState<ManageTab>("apps");
   const testCaseStore = useTestCasesStore();
+  const { savedFilters, saveFilter, deleteFilter } = useSavedFilters();
+  const [activeFilterId, setActiveFilterId] = useState("");
+  const [filterName, setFilterName] = useState("");
+  const [jumpInput, setJumpInput] = useState("");
+  const [savedTip, setSavedTip] = useState("");
 
   const selectedEntry = entries.find((e) => e.id === selectedId) ?? null;
-  const [scrollRequest, setScrollRequest] = useState<{
-    id: number;
-    seq: number;
-  } | null>(null);
+  const [scrollCommand, setScrollCommand] = useState<ScrollCommand | null>(null);
   const prevFiltersRef = useRef(filters);
 
   // 过滤条件变化时，定位到选中的日志，方便查看上下文。
@@ -78,7 +81,7 @@ export default function App() {
       prev.minLevel !== filters.minLevel;
     prevFiltersRef.current = filters;
     if (changed && selectedId != null && entries.some((e) => e.id === selectedId)) {
-      setScrollRequest({ id: selectedId, seq: Date.now() });
+      setScrollCommand({ seq: Date.now(), kind: "id", id: selectedId });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
@@ -121,7 +124,7 @@ export default function App() {
 
   const applyAppFilter = async (pkg: string) => {
     if (!pkg) {
-      setFilters({ ...filters, pid: "" });
+      setFilters((f) => ({ ...f, pid: "", app: "" }));
       return;
     }
     try {
@@ -131,10 +134,10 @@ export default function App() {
       });
       if (pids.length === 0) {
         setError(`应用「${pkg}」当前未运行`);
-        setFilters({ ...filters, pid: "" });
+        setFilters((f) => ({ ...f, pid: "", app: "" }));
       } else {
         setError(null);
-        setFilters({ ...filters, pid: pids.join(",") });
+        setFilters((f) => ({ ...f, pid: pids.join(","), app: pkg }));
       }
     } catch (e) {
       setError(String(e));
@@ -248,7 +251,7 @@ export default function App() {
 
   // 设备切换时重新解析所选应用的 PID（PID 是设备相关的）。
   useEffect(() => {
-    setFilters({ ...filters, pid: "" });
+    setFilters((f) => ({ ...f, pid: "" }));
     if (selectedPackage && selectedDevice) {
       applyAppFilter(selectedPackage);
     }
@@ -300,7 +303,49 @@ export default function App() {
 
   const locateEntry = (id: number) => {
     setSelectedId(id);
-    setScrollRequest({ id, seq: Date.now() });
+    setScrollCommand({ seq: Date.now(), kind: "id", id });
+  };
+
+  const jumpToTop = () => setScrollCommand({ seq: Date.now(), kind: "top" });
+  const jumpToBottom = () =>
+    setScrollCommand({ seq: Date.now(), kind: "bottom" });
+  const jumpToIndex = () => {
+    const n = parseInt(jumpInput, 10);
+    if (!Number.isNaN(n) && n >= 1) {
+      setScrollCommand({ seq: Date.now(), kind: "index", index: n - 1 });
+    }
+  };
+
+  const handleSaveFilter = () => {
+    const name = filterName.trim();
+    if (!name) return;
+    const id = saveFilter(name, filters);
+    setActiveFilterId(id);
+    setFilterName("");
+    setSavedTip(`已保存「${name}」`);
+    setTimeout(() => setSavedTip(""), 2000);
+  };
+
+  const handleApplyFilter = (id: string) => {
+    setActiveFilterId(id);
+    const f = savedFilters.find((x) => x.id === id);
+    if (!f) return;
+    // 用展开新对象，确保即使内容与当前相同也会触发重新过滤
+    setFilters({ ...f.filters });
+    if (f.filters.app) {
+      setSelectedPackage(f.filters.app);
+      applyAppFilter(f.filters.app);
+    } else {
+      setSelectedPackage("");
+    }
+    setSavedTip(`已应用「${f.name}」`);
+    setTimeout(() => setSavedTip(""), 2000);
+  };
+
+  const handleDeleteFilter = () => {
+    if (!activeFilterId) return;
+    deleteFilter(activeFilterId);
+    setActiveFilterId("");
   };
 
   if (view === "manage") {
@@ -483,7 +528,53 @@ export default function App() {
           <button onClick={handleRefreshApps} title="重新拉取应用清单并刷新">
             刷新
           </button>
-          <span className="count">{entries.length} 条</span>
+        </div>
+
+        <div className="toolbar-row">
+          <label>过滤器</label>
+          <select
+            value={activeFilterId}
+            onChange={(e) => handleApplyFilter(e.target.value)}
+          >
+            <option value="">（当前过滤）</option>
+            {savedFilters.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.name}
+              </option>
+            ))}
+          </select>
+          <input
+            className="filter-name"
+            value={filterName}
+            onChange={(e) => setFilterName(e.target.value)}
+            placeholder="保存为过滤器（名称）"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleSaveFilter();
+            }}
+          />
+          <button onClick={handleSaveFilter} disabled={!filterName.trim()}>
+            保存
+          </button>
+          <button onClick={handleDeleteFilter} disabled={!activeFilterId}>
+            删除
+          </button>
+          {savedTip && <span className="count">{savedTip}</span>}
+
+          <span className="toolbar-sep" />
+
+          <button onClick={jumpToTop}>最早</button>
+          <button onClick={jumpToBottom}>最新</button>
+          <input
+            className="jump-input"
+            value={jumpInput}
+            onChange={(e) => setJumpInput(e.target.value)}
+            placeholder="行号"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") jumpToIndex();
+            }}
+          />
+          <button onClick={jumpToIndex}>跳转</button>
+          <span className="count">共 {entries.length} 条</span>
         </div>
 
         {showWifi && <WifiPanel onChanged={refreshDevices} />}
@@ -494,7 +585,7 @@ export default function App() {
           entries={entries}
           selectedId={selectedId}
           onSelect={handleSelect}
-          scrollRequest={scrollRequest}
+          scrollCommand={scrollCommand}
         />
         {showCases && (
           <TestCaseSidebar

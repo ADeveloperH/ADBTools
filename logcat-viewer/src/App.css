@@ -109,6 +109,22 @@ button.active {
   font-size: 12px;
 }
 
+.filter-name {
+  min-width: 170px;
+}
+
+.jump-input {
+  min-width: 80px;
+  width: 80px;
+}
+
+.toolbar-sep {
+  width: 1px;
+  align-self: stretch;
+  background: var(--border);
+  margin: 0 4px;
+}
+
 .history-input {
   position: relative;
   display: inline-block;

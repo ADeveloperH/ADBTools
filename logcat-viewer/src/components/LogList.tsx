@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import type { LogEntry, LogLevel } from "../types";
+import type { LogEntry, LogLevel, ScrollCommand } from "../types";
 
 const ROW_HEIGHT = 20;
 const LONG_THRESHOLD = 1200;
@@ -19,10 +19,10 @@ interface Props {
   entries: LogEntry[];
   selectedId: number | null;
   onSelect: (id: number) => void;
-  scrollRequest: { id: number; seq: number } | null;
+  scrollCommand: ScrollCommand | null;
 }
 
-export function LogList({ entries, selectedId, onSelect, scrollRequest }: Props) {
+export function LogList({ entries, selectedId, onSelect, scrollCommand }: Props) {
   const parentRef = useRef<HTMLDivElement>(null);
   const autoScrollRef = useRef(true);
   const [expandedId, setExpandedId] = useState<number | null>(null);
@@ -49,15 +49,25 @@ export function LogList({ entries, selectedId, onSelect, scrollRequest }: Props)
     }
   }, [entries]);
 
-  // 收到定位请求时，滚动到选中的日志（居中，方便看上下文）。
+  // 收到滚动指令时执行：定位到指定日志 / 跳到最早、最新、指定行号。
   useEffect(() => {
-    if (!scrollRequest) return;
-    const idx = entries.findIndex((e) => e.id === scrollRequest.id);
-    if (idx >= 0) {
+    if (!scrollCommand || entries.length === 0) return;
+    const { kind } = scrollCommand;
+    if (kind === "top") {
+      virtualizer.scrollToIndex(0, { align: "start" });
+    } else if (kind === "bottom") {
+      virtualizer.scrollToIndex(entries.length - 1, { align: "end" });
+    } else if (kind === "index" && scrollCommand.index != null) {
+      const idx = Math.min(Math.max(scrollCommand.index, 0), entries.length - 1);
       virtualizer.scrollToIndex(idx, { align: "center" });
+    } else if (kind === "id" && scrollCommand.id != null) {
+      const idx = entries.findIndex((e) => e.id === scrollCommand.id);
+      if (idx >= 0) {
+        virtualizer.scrollToIndex(idx, { align: "center" });
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scrollRequest]);
+  }, [scrollCommand]);
 
   const toggleExpand = (id: number) => {
     setExpandedId((prev) => (prev === id ? null : id));

@@ -1,9 +1,17 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { error as logError, info } from "@tauri-apps/plugin-log";
-import { parseLogLine } from "../parse";
-import type { Device, LogEntry, LogLevel } from "../types";
+import { parseLogLine, stripAnsi } from "../parse";
+import type { Device, FilterState, LogEntry } from "../types";
 import { LEVEL_SEVERITY } from "../types";
 
 // 前端日志统一走 tauri-plugin-log（写入文件与终端），失败时静默忽略。
@@ -18,13 +26,7 @@ const log = {
 
 const MAX_ENTRIES = 200_000;
 
-export interface FilterState {
-  minLevel: LogLevel;
-  search: string;
-  regex: boolean;
-  tags: string;
-  pid: string;
-}
+export type { FilterState };
 
 export interface UseLogcatResult {
   devices: Device[];
@@ -44,7 +46,7 @@ export interface UseLogcatResult {
   /** 原始缓冲（未经过滤），供测试用例引擎使用 */
   allEntries: LogEntry[];
   filters: FilterState;
-  setFilters: (f: FilterState) => void;
+  setFilters: Dispatch<SetStateAction<FilterState>>;
   error: string | null;
   setError: (e: string | null) => void;
 }
@@ -62,6 +64,7 @@ export function useLogcat(): UseLogcatResult {
     regex: false,
     tags: "",
     pid: "",
+    app: "",
   });
   const [error, setError] = useState<string | null>(null);
 
@@ -217,13 +220,14 @@ export function useLogcat(): UseLogcatResult {
       if (batch.length === 0) return;
       pendingRef.current = [];
       for (const line of batch) {
-        const entry = parseLogLine(line, idRef.current++);
+        const clean = stripAnsi(line);
+        const entry = parseLogLine(clean, idRef.current++);
         if (entry) {
           bufferRef.current.push(entry);
         } else if (bufferRef.current.length > 0) {
           const last = bufferRef.current[bufferRef.current.length - 1];
-          last.message += "\n" + line;
-          last.raw += "\n" + line;
+          last.message += "\n" + clean;
+          last.raw += "\n" + clean;
         }
       }
       if (bufferRef.current.length > MAX_ENTRIES) {

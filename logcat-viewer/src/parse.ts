@@ -33,3 +33,10 @@ export function parseLogLine(line: string, id: number): LogEntry | null {
     raw: line,
   };
 }
+
+const ANSI_RE = /\x1b\[[0-9;]*[A-Za-z]/g;
+
+/** 去除 ANSI 颜色/控制转义序列（如 \x1b[31m），避免在纯文本列表里显示成乱码。 */
+export function stripAnsi(s: string): string {
+  return s.replace(ANSI_RE, "");
+}

@@ -70,14 +70,23 @@ fn start_logcat(
     let app_for_thread = app.clone();
     let generation_ref = state.generation.clone();
     std::thread::spawn(move || {
-        let reader = BufReader::new(stdout);
+        let mut reader = BufReader::new(stdout);
+        let mut buf: Vec<u8> = Vec::new();
         let mut count: u64 = 0;
-        for line in reader.lines() {
+        loop {
             if generation_ref.load(Ordering::SeqCst) != generation {
                 break;
             }
-            match line {
-                Ok(text) => {
+            buf.clear();
+            match reader.read_until(b'\n', &mut buf) {
+                Ok(0) => break, // EOF
+                Ok(_) => {
+                    // 去掉行尾的 \n 与 \r（避免 Windows 风格换行残留）
+                    while matches!(buf.last(), Some(b'\n') | Some(b'\r')) {
+                        buf.pop();
+                    }
+                    // lossy 转换：无效 UTF-8 字节替换为 �，避免中断整条读取线程
+                    let text = String::from_utf8_lossy(&buf).into_owned();
                     count += 1;
                     let _ = app_for_thread.emit("logcat-line", text);
                 }
@@ -95,13 +104,20 @@ fn start_logcat(
         let app_for_err = app.clone();
         let gen_for_err = state.generation.clone();
         std::thread::spawn(move || {
-            let reader = BufReader::new(stderr);
-            for line in reader.lines() {
+            let mut reader = BufReader::new(stderr);
+            let mut buf: Vec<u8> = Vec::new();
+            loop {
                 if gen_for_err.load(Ordering::SeqCst) != generation {
                     break;
                 }
-                match line {
-                    Ok(text) => {
+                buf.clear();
+                match reader.read_until(b'\n', &mut buf) {
+                    Ok(0) => break,
+                    Ok(_) => {
+                        while matches!(buf.last(), Some(b'\n') | Some(b'\r')) {
+                            buf.pop();
+                        }
+                        let text = String::from_utf8_lossy(&buf).into_owned();
                         log::warn!("logcat stderr：{text}");
                         let _ = app_for_err.emit("logcat-error", text);
                     }

@@ -1,5 +1,24 @@
 export type LogLevel = "V" | "D" | "I" | "W" | "E" | "F" | "A";
 
+/** 日志过滤条件（可保存为命名过滤器） */
+export interface FilterState {
+  minLevel: LogLevel;
+  search: string;
+  regex: boolean;
+  tags: string;
+  pid: string;
+  /** 应用包名（保存过滤器时记录，应用时重新解析 PID） */
+  app?: string;
+}
+
+/** 日志列表滚动指令（定位 / 跳转） */
+export interface ScrollCommand {
+  seq: number;
+  kind: "id" | "top" | "bottom" | "index";
+  id?: number;
+  index?: number;
+}
+
 export interface LogEntry {
   id: number;
   date: string;
