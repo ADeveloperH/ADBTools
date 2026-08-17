@@ -58,8 +58,16 @@ jobs:
             testbench/src-tauri/target/release/bundle/nsis/*.exe
 
   build-macos:
-    name: macOS 安装包
-    runs-on: macos-latest
+    name: macOS 安装包（${{ matrix.arch }}）
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-latest
+          - arch: x64
+            runner: macos-13
+    runs-on: ${{ matrix.runner }}
     defaults:
       run:
         working-directory: testbench
@@ -108,7 +116,7 @@ jobs:
       - name: 上传安装包
         uses: actions/upload-artifact@v4
         with:
-          name: testbench-macos
+          name: testbench-macos-${{ matrix.arch }}
           if-no-files-found: error
           path: |
             testbench/src-tauri/target/release/bundle/dmg/*.dmg
