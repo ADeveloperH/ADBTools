@@ -1,12 +1,25 @@
 # ADBTools
 
-一个独立的交互式 ADB 工具。它不需要放进任何游戏项目目录，也不要求游戏项目增加配置文件。
+Android 设备测试与调试工具集，目前包含两个工具：
+
+## TestBench（测试工作台）—— 主项目
+
+面向测试与开发的桌面工作台，覆盖日志查看、设备管理、常用调试工具、日志回归测试（规则引擎）、投屏录屏与性能监控。基于 Tauri 2 + React 构建，内置 adb/scrcpy（终端用户免安装），支持 Windows 与 macOS。
+
+- 使用/开发/构建说明：[`testbench/README.md`](testbench/README.md)
+- 安装说明（含未签名包放行步骤）：[`testbench/Docs/安装说明.md`](testbench/Docs/安装说明.md)
+- 激励框架内置测试用例规划：[`testbench/Docs/内置测试用例规划.md`](testbench/Docs/内置测试用例规划.md)
+- 跨平台构建：GitHub Actions（`.github/workflows/build.yml`），仓库 Actions 页手动触发
+
+## adbtool —— 旧版 Python CLI 工具（历史版本）
+
+独立交互式 ADB 命令行工具（Python），功能已基本被 TestBench 覆盖，保留用于兼容旧流程。它不需要放进任何游戏项目目录，也不要求游戏项目增加配置文件。
 
 ## 仓库约定
 
 本仓库后续的文档、Codex 相关 skill、规范说明和提交信息统一使用中文。保留英文仅用于必须的技术标识、命令、字段名和文件名。
 
-## 使用
+## 使用（adbtool）
 
 1. 安装 Android SDK Platform-Tools，并确保 `adb` 在 `PATH` 中。
 2. 用 USB 连接手机，打开开发者选项和 USB 调试，并在手机上确认授权。
